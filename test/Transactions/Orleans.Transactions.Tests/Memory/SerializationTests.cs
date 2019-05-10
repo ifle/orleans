@@ -1,19 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
-using Orleans.Providers;
 using Xunit;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Serialization;
-using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.Abstractions.Extensions;
-using Orleans.Transactions.Tests.Correctness;
-using TestExtensions;
 using Xunit.Abstractions;
+using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.TestKit;
 
 namespace Orleans.Transactions.Tests.Memory
 {
@@ -22,7 +15,7 @@ namespace Orleans.Transactions.Tests.Memory
     {
         private MemoryTransactionsFixture fixture;
         public SerializationTests(MemoryTransactionsFixture fixture, ITestOutputHelper output)
-            :base(fixture.GrainFactory, output)
+            :base(fixture.GrainFactory, output.WriteLine)
         {
             this.fixture = fixture;
         }
@@ -30,23 +23,22 @@ namespace Orleans.Transactions.Tests.Memory
         [Fact]
         public void JsonConcertCanSerializeMetaData()
         {
-            var grainRef = this.RandomTestGrain(TransactionTestConstants.SingleStateTransactionalGrain);
-            var ext = grainRef.Cast<ITransactionParticipantExtension>();
-            var metaData = new MetaData();
+            ITransactionTestGrain testGrain = this.RandomTestGrain(TransactionTestConstants.SingleStateTransactionalGrain);
+            GrainReference reference = (GrainReference)testGrain;
+            var metaData = new TransactionalStateMetaData();
             metaData.TimeStamp = DateTime.UtcNow;
-            metaData.CommitRecords = new Dictionary<Guid, CommitRecord>();
             metaData.CommitRecords.Add(Guid.NewGuid(), new CommitRecord()
             {
                 Timestamp = DateTime.UtcNow,
-                WriteParticipants = new List<ITransactionParticipant>() { ext.AsTransactionParticipant("resourceId")}
+                WriteParticipants = new List<ParticipantId>() { new ParticipantId("bob", reference, ParticipantId.Role.Resource | ParticipantId.Role.Manager) }
             });
-            var serializerSettings = TransactionParticipantExtensionExtensions.GetJsonSerializerSettings(
+            JsonSerializerSettings serializerSettings = TransactionalStateFactory.GetJsonSerializerSettings(
                 this.fixture.Client.ServiceProvider.GetService<ITypeResolver>(),
                 this.grainFactory);
             //should be able to serialize it
-            var jsonMetaData = JsonConvert.SerializeObject(metaData, serializerSettings);
+            string jsonMetaData = JsonConvert.SerializeObject(metaData, serializerSettings);
 
-            var deseriliazedMetaData = JsonConvert.DeserializeObject<MetaData>(jsonMetaData, serializerSettings);
+            TransactionalStateMetaData deseriliazedMetaData = JsonConvert.DeserializeObject<TransactionalStateMetaData>(jsonMetaData, serializerSettings);
             Assert.Equal(metaData.TimeStamp, deseriliazedMetaData.TimeStamp);
         }
     }

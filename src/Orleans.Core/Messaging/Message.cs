@@ -14,8 +14,6 @@ namespace Orleans.Runtime
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
-        #region metadata
-
         [NonSerialized]
         private string _targetHistory;
 
@@ -52,8 +50,6 @@ namespace Orleans.Runtime
             get { return _maxRetries; }
             set { _maxRetries = value; }
         }
-
-        #endregion
 
         /// <summary>
         /// NOTE: The contents of bodyBytes should never be modified
@@ -100,6 +96,7 @@ namespace Orleans.Runtime
             DuplicateRequest,
             Unrecoverable,
             GatewayTooBusy,
+            CacheInvalidation
         }
 
         internal HeadersContainer Headers { get; set; } = new HeadersContainer();
@@ -335,6 +332,9 @@ namespace Orleans.Runtime
             get { return Headers.CacheInvalidationHeader; }
             set { Headers.CacheInvalidationHeader = value; }
         }
+
+        public bool HasCacheInvalidationHeader => this.CacheInvalidationHeader != null
+                                                  && this.CacheInvalidationHeader.Count > 0;
         
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {
@@ -482,8 +482,6 @@ namespace Orleans.Runtime
             return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
         }
 
-        #region Serialization
-
         public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
         {
             var context = new SerializationContext(serializationManager)
@@ -545,8 +543,6 @@ namespace Orleans.Runtime
             BufferPool.GlobalPool.Release(bodyBytes);
             bodyBytes = null;
         }
-
-        #endregion
 
         // For testing and logging/tracing
         public string ToLongString()
